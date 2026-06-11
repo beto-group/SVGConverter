@@ -83,10 +83,10 @@ async function loadScript(src, options = {}) {
 
     const adapter = dc.app.vault.adapter;
 
-    // dc.resolvePath returns a note FILE path (e.g. ".../_DONE/SVG CONVERTER/SVG CONVERTER.md")
+    // dc.resolvePath returns a note FILE path (e.g. ".../_DONE/SVGConverter/SVGConverter.md")
     // We need the FOLDER, so we strip the filename portion.
     let componentPath;
-    const resolvedNote = dc.resolvePath("SVG CONVERTER");
+    const resolvedNote = dc.resolvePath("SVGConverter");
     if (resolvedNote) {
         // Strip filename to get folder path
         componentPath = resolvedNote.includes("/")
@@ -97,7 +97,7 @@ async function loadScript(src, options = {}) {
         if (activeFile) {
             componentPath = activeFile.path.substring(0, activeFile.path.lastIndexOf("/"));
         } else {
-            componentPath = "_RESOURCES/DATACORE/_DONE/SVG CONVERTER";
+            componentPath = "_RESOURCES/DATACORE/_DONE/SVGConverter";
         }
     }
 
@@ -3823,7 +3823,7 @@ function MainContainer({ folderPath, onAutomationComplete }) {
     const currentFilePath = dc.useCurrentPath();
     const resolvedFolderPath = currentFilePath 
         ? currentFilePath.substring(0, currentFilePath.lastIndexOf("/")) 
-        : (folderPath || "_RESOURCES/DATACORE/_DONE/SVG CONVERTER");
+        : (folderPath || "_RESOURCES/DATACORE/_DONE/SVGConverter");
     const [currentView, setCurrentView] = useState('welcome');
     const [isFullTab, setIsFullTab] = useState(true);
     const containerRef = useRef(null);

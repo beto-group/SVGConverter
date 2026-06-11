@@ -91,7 +91,7 @@ async function View({ folderPath }) {
         dc.useEffect(() => {
             const load = async () => {
                 try {
-                    const appPath = dc.resolvePath("SVG CONVERTER/src/App.jsx") || (folderPath ? (folderPath.replace(/\/[^\/]+\.md$/, '') + '/src/App.jsx') : 'src/App.jsx');
+                    const appPath = dc.resolvePath("SVGConverter/src/App.jsx") || (folderPath ? (folderPath.replace(/\/[^\/]+\.md$/, '') + '/src/App.jsx') : 'src/App.jsx');
                     const { SVGConverter } = await dc.require(appPath);
                     setApp({ SVGConverter });
                 } catch (e) {

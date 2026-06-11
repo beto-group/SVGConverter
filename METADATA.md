@@ -35,7 +35,7 @@ storage:
   - Obsidian Configuration
 network: Online
 runtime: React
-entry_point: SVG CONVERTER.md
+entry_point: SVGConverter.md
 logic: src/index.jsx
 ---
 
