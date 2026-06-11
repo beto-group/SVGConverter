@@ -39,7 +39,7 @@ Welcome to **SVG Converter**, an advanced batch conversion pipeline designed to 
 To try SVG Converter today:
 1. **Download the Repository**: Clone or download this repository directly into any folder inside your Obsidian vault.
 2. **Install Datacore**: Ensure you have the **Datacore** plugin installed and enabled in Obsidian.
-3. **Open the Entry Note**: Open the **`SVGConverter.md`** note inside Obsidian to launch the component!
+3. **Open the Entry Note**: Open the **`SVG CONVERTER.md`** note inside Obsidian to launch the component!
 
 ---
 
@@ -66,7 +66,7 @@ The package exposes the following compiled files:
 
 | File | Description |
 | :--- | :--- |
-| **[`SVGConverter.md`](SVGConverter.md)** | The main entry point note designed to be opened in Obsidian. |
+| **[`SVG CONVERTER.md`](SVG%20CONVERTER.md)** | The main entry point note designed to be opened in Obsidian. |
 | **[`src/index.jsx`](src/index.jsx)** | Bootstrapper component with dynamic status-bar and scrollbar suppression. |
 | **[`src/App.jsx`](src/App.jsx)** | Main component shell containing UI states, batch processing loop, and font-embedding tools. |
 | **[`assets/`](assets/)** | Media assets including preview clips, walkthroughs, and images. |
