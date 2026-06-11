@@ -1,0 +1,9 @@
+# Ignore OS generated files
+.DS_Store
+
+# Ignore component local configuration and cache files
+data/config.json
+data/cache/
+
+# Ignore generated SVGs in the samples directory
+data/svg_samples/**/*.svg
