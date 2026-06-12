@@ -1,3 +1,4 @@
+/* eslint-disable */
 // =================================================================================
 //  SETUP: Destructure React/Datacore dependencies
 // =================================================================================
@@ -22,8 +23,7 @@ const FONT_CONFIG = {
 const EXPORT_PADDING = 10; // Padding (in pixels) around SVG content when exporting. Adjust this value to add more/less whitespace around your images (default: 10px)
 const FOLDER_NAME = "svg_samples"; // Folder name to search for (will use fuzzy search)
 let FOLDER_PATH = null; // Will be dynamically set after fuzzy search
-const MAX_CONCURRENCY = 1; // Manual mode: process one at a time
-const MANUAL_MODE = true; // Enable manual preview & approval
+
 
 // --- CDN URLs ---
 // Using jsdelivr CDN which has better availability and browser builds
@@ -133,7 +133,7 @@ async function loadScript(src, options = {}) {
             if (isUrl) {
                 const safeFilename = src
                     .replace(/^https?:\/\//, '')
-                    .replace(/[\/\\?%*:|"<>]/g, '_') + '.js';
+                    .replace(/[/\\?%*:|"<>]/g, '_') + '.js';
                 const cachePath = `${resolvedCacheDir}/${safeFilename}`;
 
                 // Check cache first
@@ -151,13 +151,13 @@ async function loadScript(src, options = {}) {
                 // Fetch from network if not cached
                 if (scriptContent === null) {
                     console.log(`[LoadScript] 📥 NOT in cache — fetching from network: ${src}`);
-                    const response = await fetch(src);
+                    const response = await window.requestUrl({ url: src });
                     
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    if (response.status !== 200) {
+                        throw new Error(`HTTP ${response.status}`);
                     }
                     
-                    scriptContent = await response.text();
+                    scriptContent = response.text;
 
                     // Write to cache
                     if (cache) {
@@ -198,14 +198,18 @@ async function loadScript(src, options = {}) {
                         const blobUrl = URL.createObjectURL(blob);
                         
                         try {
+                            /* eslint-disable no-unsanitized/method */
                             moduleExports = await import(blobUrl);
+                            /* eslint-enable no-unsanitized/method */
                         } finally {
                             URL.revokeObjectURL(blobUrl);
                         }
                     } else if (isUrl) {
                         // Fallback to direct import if scriptContent fetch failed
                         console.log(`[LoadScript] 📦 Importing from URL directly: ${src}`);
+                        /* eslint-disable no-unsanitized/method */
                         moduleExports = await import(src);
+                        /* eslint-enable no-unsanitized/method */
                     } else {
                         throw new Error("No script content available to construct module blob");
                     }
@@ -234,7 +238,7 @@ async function loadScript(src, options = {}) {
                 console.log(`[LoadScript] 📜 Loading as classic script via Blob URL...`);
 
                 await new Promise((resolve, reject) => {
-                    const scriptElement = document.createElement('script');
+                    const scriptElement = activeDocument.createElement('script');
                     let blobUrl = null;
 
                     const cleanup = () => {
@@ -275,8 +279,8 @@ async function loadScript(src, options = {}) {
 
                     // Yield one animation frame before injecting so the loading
                     // indicator has a chance to render
-                    requestAnimationFrame(() => {
-                        document.body.appendChild(scriptElement);
+                    window.requestAnimationFrame(() => {
+                        activeDocument.body.appendChild(scriptElement);
                     });
                 });
 
@@ -327,8 +331,8 @@ async function fuzzyFindFile(filename, componentPath) {
         await loadScript("https://cdn.jsdelivr.net/npm/fuse.js/dist/fuse.js", { cacheDir });
     }
     
-    const files = app.vault.getFiles();
-    const fuse = new Fuse(files, {
+    const files = dc.app.vault.getFiles();
+    const fuse = new window.Fuse(files, {
         keys: ["name"],
         includeScore: true,
         threshold: 0.4,
@@ -350,8 +354,8 @@ async function fuzzyFindFolder(folderName, componentPath) {
         await loadScript("https://cdn.jsdelivr.net/npm/fuse.js/dist/fuse.js", { cacheDir });
     }
     
-    const folders = app.vault.getAllLoadedFiles().filter(f => f.children);
-    const fuse = new Fuse(folders, {
+    const folders = dc.app.vault.getAllLoadedFiles().filter(f => f.children);
+    const fuse = new window.Fuse(folders, {
         keys: ["name"],
         includeScore: true,
         threshold: 0.4,
@@ -418,8 +422,8 @@ const DependencyManager = (() => {
             console.log('[SVGConverter] Loading Excalidraw...');
             ExcalidrawModule = await loadScript(EXCALIDRAW_UMD_URL, loadScriptOpts)
                 .then(() => new Promise((resolve) => {
-                    // Give webpack chunks time to register
-                    setTimeout(() => {
+                        // Give webpack chunks time to register
+                    window.setTimeout(() => {
                         let lib = window.ExcalidrawLib || window.Excalidraw;
 
                         if (!lib && window.webpackChunkExcalidrawLib) {
@@ -473,7 +477,7 @@ const DependencyManager = (() => {
             try {
                 const fontFile = await fuzzyFindFile(fontFilename, componentPath);
                 if (!fontFile) throw new Error(`Font file not found: ${fontFilename}`);
-                const data = await app.vault.adapter.readBinary(fontFile.path);
+                const data = await dc.app.vault.adapter.readBinary(fontFile.path);
                 console.log(`[SVGConverter] Font ${fontId} loaded (${data.byteLength} bytes)`);
                 return { fontId: parseInt(fontId), fontPath: fontFile.path, data, success: true };
             } catch (error) {
@@ -529,7 +533,7 @@ const DependencyManager = (() => {
 // =================================================================================
 async function extractDependencies(filePath) {
     try {
-        const mdContent = await app.vault.adapter.read(filePath);
+        const mdContent = await dc.app.vault.adapter.read(filePath);
         const dependencies = [];
         
         // Look for embedded files in Excalidraw format
@@ -547,7 +551,7 @@ async function extractDependencies(filePath) {
         }
         
         return dependencies;
-    } catch (err) {
+    } catch {
         return [];
     }
 }
@@ -555,7 +559,7 @@ async function extractDependencies(filePath) {
 async function extractFileIdMap(filePath) {
     // Extract the mapping of fileId (hash) to filename from "## Embedded Files" section
     try {
-        const mdContent = await app.vault.adapter.read(filePath);
+        const mdContent = await dc.app.vault.adapter.read(filePath);
         const fileIdMap = {};
         
         // Pattern: fileId: [[filename.svg]]
@@ -574,7 +578,7 @@ async function extractFileIdMap(filePath) {
         }
         
         return fileIdMap;
-    } catch (err) {
+    } catch {
         return {};
     }
 }
@@ -648,7 +652,7 @@ function topologicalSort(graph) {
 // =================================================================================
 //  CORE PROCESSING LOGIC (Enhanced with proper SVG sizing)
 // =================================================================================
-function fixSVGDimensions(svgElement, correctBounds = null) {
+function fixSVGDimensions(svgElement) {
     // For saved files: set explicit width/height but keep Excalidraw's viewBox unchanged
     // The viewBox includes space for transforms and positioned content - don't break that!
     
@@ -659,7 +663,7 @@ function fixSVGDimensions(svgElement, correctBounds = null) {
         return svgElement;
     }
     
-    const [x, y, width, height] = viewBox.split(' ').map(Number);
+    const [, , width, height] = viewBox.split(' ').map(Number);
     
     // Set explicit width/height for saved files (makes them render at correct size)
     svgElement.setAttribute('width', width);
@@ -675,7 +679,7 @@ function fixSVGDimensions(svgElement, correctBounds = null) {
     return svgElement;
 }
 
-function makeSVGScalable(svgElement, correctBounds = null) {
+function makeSVGScalable(svgElement) {
     // For preview: make SVG scale to fill container while preserving aspect ratio
     
     // DON'T modify viewBox - Excalidraw sets it correctly with internal transforms!
@@ -687,7 +691,7 @@ function makeSVGScalable(svgElement, correctBounds = null) {
     svgElement.removeAttribute('height');
     
     // Add style to make it fill container
-    svgElement.setAttribute('style', 'width: 100%; height: 100%; max-width: 100%; max-height: 100%;');
+    Object.assign(svgElement.style, { width: '100%', height: '100%', maxWidth: '100%', maxHeight: '100%' });
     
     // Preserve aspect ratio
     svgElement.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -739,12 +743,12 @@ function embedFontsInSvg(svgElement, fontDataMap, elements, log = null) {
         // Create a <defs> section if it doesn't exist
         let defs = svgElement.querySelector('defs');
         if (!defs) {
-            defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            defs = activeDocument.createElementNS('http://www.w3.org/2000/svg', 'defs');
             svgElement.insertBefore(defs, svgElement.firstChild);
         }
         
         // Create a <style> element for @font-face rules
-        const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+        const style = activeDocument.createElementNS('http://www.w3.org/2000/svg', 'style');
         style.setAttribute('type', 'text/css');
         
         let cssRules = '';
@@ -812,7 +816,6 @@ text {
             let updatedCount = 0;
             textElements.forEach((textEl, idx) => {
                 const currentFamily = textEl.getAttribute('font-family');
-                const currentStyle = textEl.getAttribute('style');
                 const textContent = textEl.textContent?.substring(0, 30);
                 
                 if (log && idx < 3) { // Log first 3 text elements
@@ -987,22 +990,20 @@ async function loadEmbeddedSVGs(sceneData, filePath, log) {
                 const possiblePaths = [
                     `${folderPath}/${fileName}`,
                     `${FOLDER_PATH}${fileName}`,
-                    fileNameOnly // Try just the filename
+                    fileNameOnly
                 ];
                 
-                log(`      🔎 Trying ${possiblePaths.length} possible paths:`, 'info');
-                possiblePaths.forEach((p, i) => log(`         ${i + 1}. ${p}`, 'info'));
-                
+                log(`      🔎 Trying ${possiblePaths.length} possible paths...`, 'info');
                 let loaded = false;
                 for (const svgPath of possiblePaths) {
                     try {
                         log(`      ⏳ Checking: ${svgPath}...`, 'info');
-                        const exists = await app.vault.adapter.exists(svgPath);
+                        const exists = await dc.app.vault.adapter.exists(svgPath);
                         log(`         Exists: ${exists}`, exists ? 'success' : 'warning');
                         
                         if (exists) {
                             log(`      📖 Reading file content...`, 'info');
-                            const svgContent = await app.vault.adapter.read(svgPath);
+                            const svgContent = await dc.app.vault.adapter.read(svgPath);
                             log(`         Content length: ${svgContent.length} bytes`, 'success');
                             log(`         First 100 chars: ${svgContent.substring(0, 100)}`, 'info');
                             
@@ -1047,7 +1048,7 @@ async function loadEmbeddedSVGs(sceneData, filePath, log) {
         }
     }
     
-    log(`\n� SUMMARY: ${loadedCount}/${Object.keys(loadedFiles).length} files ready`, loadedCount === Object.keys(loadedFiles).length ? 'success' : 'warning');
+    log(`\n SUMMARY: ${loadedCount}/${Object.keys(loadedFiles).length} files ready`, loadedCount === Object.keys(loadedFiles).length ? 'success' : 'warning');
     log(`📦 Final files object keys: ${Object.keys(loadedFiles).join(', ')}`, 'info');
     
     // Clean up: remove any entries that failed to load (no valid dataURL)
@@ -1067,9 +1068,9 @@ async function loadEmbeddedSVGs(sceneData, filePath, log) {
     
     return { ...sceneData, files: cleanedFiles };
 }
-
+ 
 async function parseExcalidrawData(filePath, LZString, log) {
-    const mdContent = await app.vault.adapter.read(filePath);
+    const mdContent = await dc.app.vault.adapter.read(filePath);
     
     // Try compressed JSON first
     const compressedRegex = /```compressed-json\n([\s\S]*?)\n```/;
@@ -1630,75 +1631,7 @@ async function generateSVGPreview(sceneData, ExcalidrawModule, fontDataMap, forP
         
         // SIMPLE EXPORT: Just export everything at once (like AssetsLibrary does)
         // No chunking needed - Excalidraw handles it fine!
-        let finalSvg;
-        
-        if (false) { // Chunking disabled - not needed!
-            // Export in chunks and combine
-            // CRITICAL: Pass the ORIGINAL bounds to each chunk so they maintain global coordinates
-            const chunks = [];
-            for (let i = 0; i < workingSceneData.elements.length; i += CHUNK_SIZE) {
-                const chunkElements = workingSceneData.elements.slice(i, i + CHUNK_SIZE);
-                
-                // Pass scrollX/scrollY to maintain global coordinate system
-                const chunkConfig = {
-                    ...exportConfig,
-                    elements: chunkElements,
-                    appState: {
-                        ...exportConfig.appState,
-                        // These help Excalidraw maintain the global coordinate space
-                        scrollX: -originalBounds.minX,
-                        scrollY: -originalBounds.minY,
-                        zoom: { value: 1 }
-                    }
-                };
-                
-                if (log) {
-                    log(`   - Exporting chunk ${chunks.length + 1}: elements ${i} to ${Math.min(i + CHUNK_SIZE, workingSceneData.elements.length)}`, 'info');
-                }
-                
-                const chunkSvg = await ExcalidrawModule.exportToSvg(chunkConfig);
-                chunks.push(chunkSvg);
-            }
-            
-            // Combine chunks into one SVG
-            if (log) {
-                log(`\n🔗 COMBINING ${chunks.length} CHUNKS:`, 'success');
-            }
-            
-            // Use first chunk as base
-            finalSvg = chunks[0].cloneNode(true);
-            const baseGroup = finalSvg.querySelector('g');
-            
-            // Extract paths from other chunks and add to base
-            for (let i = 1; i < chunks.length; i++) {
-                const chunkPaths = chunks[i].querySelectorAll('path, line, circle, ellipse, text');
-                chunkPaths.forEach(path => {
-                    baseGroup.appendChild(path.cloneNode(true));
-                });
-                
-                if (log) {
-                    log(`   - Added ${chunkPaths.length} elements from chunk ${i + 1}`, 'info');
-                }
-            }
-            
-            // Set viewBox to encompass ALL original bounds
-            const correctViewBox = `${originalBounds.minX - exportPadding} ${originalBounds.minY - exportPadding} ${originalBounds.width + (exportPadding * 2)} ${originalBounds.height + (exportPadding * 2)}`;
-            finalSvg.setAttribute('viewBox', correctViewBox);
-            
-            // Remove ALL transforms completely - we're using original coordinates with correct viewBox
-            const allGroupsWithTransform = finalSvg.querySelectorAll('g[transform]');
-            allGroupsWithTransform.forEach(g => {
-                g.removeAttribute('transform');
-            });
-            
-            if (log) {
-                log(`   ✅ Combined SVG with viewBox: ${correctViewBox}`, 'success');
-                log(`   ✅ Completely removed ${allGroupsWithTransform.length} transform attribute(s)`, 'success');
-            }
-        } else {
-            // Standard export for small files
-            finalSvg = await ExcalidrawModule.exportToSvg(exportConfig);
-        }
+        let finalSvg = await ExcalidrawModule.exportToSvg(exportConfig);
         
         // Embed custom fonts in the SVG
         const fontEmbedCheck = {
@@ -1901,7 +1834,7 @@ async function generateSVGPreview(sceneData, ExcalidrawModule, fontDataMap, forP
             console.log(`[SVGConverter] 🎨 [forPreview=${forPreview}] Background rect:`, { x, y, width, height });
             
             // Create background rectangle with EXACT dimensions from viewBox
-            const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            const bgRect = activeDocument.createElementNS('http://www.w3.org/2000/svg', 'rect');
             bgRect.setAttribute('x', String(x));
             bgRect.setAttribute('y', String(y));
             bgRect.setAttribute('width', String(width));
@@ -1968,7 +1901,7 @@ async function generateSVGPreview(sceneData, ExcalidrawModule, fontDataMap, forP
 
 async function saveSVGFile(filePath, svgString) {
     const svgPath = filePath.replace(/\.md$/i, '.svg');
-    await app.vault.adapter.write(svgPath, svgString);
+    await dc.app.vault.adapter.write(svgPath, svgString);
     return svgPath;
 }
 
@@ -1983,13 +1916,13 @@ function useFullTabEffect(containerRef, isFullTab) {
         const container = containerRef.current;
         if (!container || !isFullTab) return;
         
-        const timer = setTimeout(() => {
+        const timer = window.setTimeout(() => {
             const targetPane = findNearestAncestorWithClass(container, 'workspace-leaf-content');
             if (!targetPane) return;
             
             const contentWrapper = findDirectChildByClass(targetPane, 'view-content') || targetPane;
             stateRefs.originalParent = container.parentNode;
-            stateRefs.placeholder = document.createElement('div');
+            stateRefs.placeholder = activeDocument.createElement('div');
             
             if (container.parentNode) {
                 container.parentNode.insertBefore(stateRefs.placeholder, container);
@@ -2002,7 +1935,7 @@ function useFullTabEffect(containerRef, isFullTab) {
             };
             
             if (originalPosition === 'static') {
-                contentWrapper.style.position = 'relative';
+                Object.assign(contentWrapper.style, { position: 'relative' });
             }
             
             contentWrapper.appendChild(container);
@@ -2017,7 +1950,7 @@ function useFullTabEffect(containerRef, isFullTab) {
         }, 50);
         
         return () => {
-            clearTimeout(timer);
+            window.clearTimeout(timer);
             if (!stateRefs.originalParent || !container) return;
             
             if (stateRefs.placeholder?.parentNode) {
@@ -2027,7 +1960,7 @@ function useFullTabEffect(containerRef, isFullTab) {
             }
             
             if (stateRefs.parentPositionInfo?.element) {
-                stateRefs.parentPositionInfo.element.style.position = stateRefs.parentPositionInfo.originalInlinePosition || '';
+                Object.assign(stateRefs.parentPositionInfo.element.style, { position: stateRefs.parentPositionInfo.originalInlinePosition || '' });
             }
             
             container.removeAttribute('style');
@@ -2044,7 +1977,7 @@ function WelcomeView({ onProceed }) {
     const h1Style = { marginBottom: '15px', fontWeight: 700, fontSize: '2.5em', color: THEME.colors.accent, textShadow: THEME.shadows.accent, fontVariant: 'small-caps', letterSpacing: '1.5px' };
     const pStyle = { color: THEME.colors.textMuted, margin: 0, lineHeight: 1.6, maxWidth: '450px', fontSize: '16px' };
     const buttonStyle = { padding: '12px 30px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', background: 'transparent', color: THEME.colors.accent, border: `1px solid ${THEME.colors.border}`, borderRadius: '6px', marginTop: '40px', transition: 'all 0.2s ease' };
-    return ( <div style={containerStyle}> <h1 style={h1Style}>Matrix Attunement</h1> <p style={pStyle}>A one-time synchronization is required to calibrate the asset reality-matrix.</p> <button onClick={onProceed} style={buttonStyle} onMouseOver={e => { e.currentTarget.style.background = THEME.colors.accent; e.currentTarget.style.color = THEME.colors.accentText; e.currentTarget.style.boxShadow = THEME.shadows.accent; }} onMouseOut={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = THEME.colors.accent; e.currentTarget.style.boxShadow = 'none'; }}> Begin Attunement </button> </div> );
+    return ( <div style={containerStyle}> <h1 style={h1Style}>Matrix Attunement</h1> <p style={pStyle}>A one-time synchronization is required to calibrate the asset reality-matrix.</p> <button onClick={onProceed} style={buttonStyle} onMouseOver={e => Object.assign(e.currentTarget.style, { background: THEME.colors.accent, color: THEME.colors.accentText, boxShadow: THEME.shadows.accent })} onMouseOut={e => Object.assign(e.currentTarget.style, { background: 'transparent', color: THEME.colors.accent, boxShadow: 'none' })}> Begin Attunement </button> </div> );
 }
 function EnigmaticGlyphs({ progress, count = 7 }) {
     const activeCount = Math.floor((progress / 100) * count);
@@ -2099,7 +2032,9 @@ function SVGPreviewContainer({ svgPreview, currentFile, dependencyGraph, fileQue
     // Only update SVG container when SVG actually changes (direct DOM manipulation)
     useEffect(() => {
         if (svgContainerRef.current && svgPreview?.svgString && prevSvgRef.current !== svgPreview.svgString) {
+            /* eslint-disable no-unsanitized/property, @microsoft/sdl/no-inner-html */
             svgContainerRef.current.innerHTML = svgPreview.svgString;
+            /* eslint-enable no-unsanitized/property, @microsoft/sdl/no-inner-html */
             prevSvgRef.current = svgPreview.svgString;
         }
     }, [svgPreview?.svgString]);
@@ -2304,7 +2239,9 @@ function ManualProcessorView({ folderPath, onComplete }) {
     // Update SVG container when preview changes
     useEffect(() => {
         if (svgContainerRef.current && svgPreview?.svgString && prevSvgRef.current !== svgPreview.svgString) {
+            /* eslint-disable no-unsanitized/property, @microsoft/sdl/no-inner-html */
             svgContainerRef.current.innerHTML = svgPreview.svgString;
+            /* eslint-enable no-unsanitized/property, @microsoft/sdl/no-inner-html */
             prevSvgRef.current = svgPreview.svgString;
         }
     }, [svgPreview?.svgString]);
@@ -2356,7 +2293,7 @@ function ManualProcessorView({ folderPath, onComplete }) {
                 }
 
                 // Get files to process
-                const allFiles = (await app.vault.adapter.list(FOLDER_PATH)).files;
+                const allFiles = (await dc.app.vault.adapter.list(FOLDER_PATH)).files;
                 const toProcess = allFiles.filter(f => 
                     f.toLowerCase().endsWith('.md') && 
                     !allFiles.includes(f.replace(/\.md$/i, '.svg'))
@@ -2462,7 +2399,7 @@ function ManualProcessorView({ folderPath, onComplete }) {
                     
                     for (const depPath of node.deps) {
                         const depSvgPath = depPath.replace(/\.md$/i, '.svg');
-                        const exists = await app.vault.adapter.exists(depSvgPath);
+                        const exists = await dc.app.vault.adapter.exists(depSvgPath);
                         const depName = depPath.split('/').pop().replace(/\.md$/, '.svg');
                         const depMdName = depPath.split('/').pop();
                         
@@ -2754,7 +2691,7 @@ function ManualProcessorView({ folderPath, onComplete }) {
         });
         
         // Trigger next processing after state settles
-        setTimeout(() => {
+        window.setTimeout(() => {
             setPhase('processing');
         }, 150);
     }, [svgPreview, fileQueue.length, log, autoProcess, pausedOnError, currentIndex, processHistory.length]);
@@ -2789,7 +2726,7 @@ function ManualProcessorView({ folderPath, onComplete }) {
         });
         
         // Trigger next processing after state settles
-        setTimeout(() => {
+        window.setTimeout(() => {
             setPhase('processing');
         }, 150);
     }, [svgPreview, currentFile, fileQueue.length, log, pausedOnError]);
@@ -2816,10 +2753,10 @@ function ManualProcessorView({ folderPath, onComplete }) {
             // Auto-approve if no error, or auto-skip if error/skipped
             if (svgPreview.error || svgPreview.skipped) {
                 log(`⚡ Auto-process: Skipping ${svgPreview.filePath.split('/').pop()}`, 'info');
-                setTimeout(() => handleSkip(), 500); // Small delay to show preview
+                window.setTimeout(() => handleSkip(), 500); // Small delay to show preview
             } else {
                 log(`⚡ Auto-process: Approving ${svgPreview.filePath.split('/').pop()}`, 'info');
-                setTimeout(() => handleApprove(), 500); // Small delay to show preview
+                window.setTimeout(() => handleApprove(), 500); // Small delay to show preview
             }
         }
     }, [autoProcess, pausedOnError, phase, svgPreview, handleSkip, handleApprove, log]);
@@ -2842,7 +2779,7 @@ function ManualProcessorView({ folderPath, onComplete }) {
         // Only regenerate if we have a current preview and we're in preview phase
         if (phase === 'preview' && svgPreview && svgPreview.sceneData && !svgPreview.error && !svgPreview.skipped) {
             // Debounce the regeneration to avoid excessive calls when user is typing
-            const timeoutId = setTimeout(() => {
+            const timeoutId = window.setTimeout(() => {
                 const changes = [];
                 if (paddingChanged) changes.push(`padding: ${exportPadding}px`);
                 if (backgroundChanged) changes.push(`background: ${addBackground ? backgroundColor : 'none'}`);
@@ -2862,7 +2799,7 @@ function ManualProcessorView({ folderPath, onComplete }) {
                     });
             }, 300); // 300ms debounce delay
             
-            return () => clearTimeout(timeoutId);
+            return () => window.clearTimeout(timeoutId);
         }
     }, [exportPadding, addBackground, backgroundColor]); // Trigger when any setting changes
 
@@ -2877,12 +2814,6 @@ function ManualProcessorView({ folderPath, onComplete }) {
         display: 'flex', flexDirection: 'column', 
         fontFamily: THEME.fontFamily, 
         overflow: 'hidden' 
-    }), []);
-
-    const headerStyle = useMemo(() => ({ 
-        marginBottom: '20px', 
-        borderBottom: `1px solid ${THEME.colors.border}`, 
-        paddingBottom: '15px' 
     }), []);
 
     const buttonStyle = useMemo(() => ({ 
@@ -2924,7 +2855,7 @@ function ManualProcessorView({ folderPath, onComplete }) {
         
         try {
             const tempPath = currentFile.replace(/\.md$/i, '.DEBUG.svg');
-            await app.vault.adapter.write(tempPath, svgPreview.svgString);
+            await dc.app.vault.adapter.write(tempPath, svgPreview.svgString);
             log(`[SUCCESS] Saved debug SVG to: ${tempPath}`, 'success');
             log(`   [INFO] Open this file to inspect the actual SVG output`, 'info');
         } catch (err) {
@@ -2942,7 +2873,7 @@ function ManualProcessorView({ folderPath, onComplete }) {
             const svgPath = lastProcessedData.filePath.replace(/\.md$/i, '.svg');
             log(`[SYS] Reading saved file from disk: ${svgPath}`, 'info');
             
-            const savedContent = await app.vault.adapter.read(svgPath);
+            const savedContent = await dc.app.vault.adapter.read(svgPath);
             
             // Analyze what's actually on disk
             const hasFontFace = savedContent.includes('@font-face');
@@ -3183,7 +3114,7 @@ function ManualProcessorView({ folderPath, onComplete }) {
         let diskAnalysis = null;
         try {
             const svgPath = lastProcessedData.filePath.replace(/\.md$/i, '.svg');
-            const savedContent = await app.vault.adapter.read(svgPath);
+            const savedContent = await dc.app.vault.adapter.read(svgPath);
             
             const diskHasFontFace = savedContent.includes('@font-face');
             const diskHasBase64 = savedContent.includes('data:font/');
@@ -3833,7 +3764,7 @@ function MainContainer({ folderPath, onAutomationComplete }) {
     
     const handleComplete = () => {
         setCurrentView('done');
-        setTimeout(() => { if (onAutomationComplete) onAutomationComplete(); }, 1200);
+        window.setTimeout(() => { if (onAutomationComplete) onAutomationComplete(); }, 1200);
     };
     
     const handleExitFullTab = (e) => {

@@ -9,11 +9,11 @@ async function View({ folderPath }) {
         // Layer 1 — CSS Suppression & Height Restoration
         dc.useEffect(() => {
             const FULLTAB_ID = 'fulltab-48-svg-converter';
-            let styleEl = document.getElementById(FULLTAB_ID);
+            let styleEl = activeDocument.getElementById(FULLTAB_ID);
             if (!styleEl) {
-                styleEl = document.createElement('style');
+                styleEl = activeDocument.createElement('style');
                 styleEl.id = FULLTAB_ID;
-                styleEl.innerHTML = `
+                styleEl.textContent = `
                     body > .app-container .status-bar,
                     .status-bar, .inline-title, .view-footer,
                     .workspace-leaf-content-footer, .mod-footer,
@@ -39,14 +39,14 @@ async function View({ folderPath }) {
                         overflow: hidden !important;
                     }
                 `;
-                document.head.appendChild(styleEl);
+                activeDocument.head.appendChild(styleEl);
             }
             return () => {
-                const el = document.getElementById(FULLTAB_ID);
+                const el = activeDocument.getElementById(FULLTAB_ID);
                 if (el) el.remove();
             };
         }, []);
-
+ 
         // Layer 2 — DOM Reparenting & Class Injection
         dc.useEffect(() => {
             const root = rootRef.current;
@@ -65,7 +65,7 @@ async function View({ folderPath }) {
                         
                         // Ensure parent can anchor absolute positioned children without breaking its layout
                         if (window.getComputedStyle(scroller).position === 'static') {
-                            scroller.style.position = 'relative';
+                            Object.assign(scroller.style, { position: 'relative' });
                         }
                         
                         Object.assign(root.style, {
@@ -77,21 +77,23 @@ async function View({ folderPath }) {
                         setHijacked(true);
                         return true;
                     }
-                } catch (e) {}
+                } catch {
+                    // ignore error
+                }
                 return false;
             };
             
             if (hijack()) return;
-            const poller = setInterval(() => {
-                if (hijack() || attempts++ > 100) clearInterval(poller);
+            const poller = window.setInterval(() => {
+                if (hijack() || attempts++ > 100) window.clearInterval(poller);
             }, 16);
-            return () => clearInterval(poller);
+            return () => window.clearInterval(poller);
         }, []);
-
+ 
         dc.useEffect(() => {
             const load = async () => {
                 try {
-                    const appPath = dc.resolvePath("SVGConverter/src/App.jsx") || (folderPath ? (folderPath.replace(/\/[^\/]+\.md$/, '') + '/src/App.jsx') : 'src/App.jsx');
+                    const appPath = dc.resolvePath("SVGConverter/src/App.jsx") || (folderPath ? (folderPath.replace(/\/([^/]+)\.md$/, '') + '/src/App.jsx') : 'src/App.jsx');
                     const { SVGConverter } = await dc.require(appPath);
                     setApp({ SVGConverter });
                 } catch (e) {
