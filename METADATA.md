@@ -24,8 +24,8 @@ repository:
   - https://github.com/beto-group/SVGConverter
 missing: []
 resources:
-  - assets/svgconverter.clip.gif
-  - assets/svg_converter.webp
+  - assets/videos/preview.gif
+  - assets/image/preview_1.webp
 type: DatacoreComponent
 target: Datacore
 security:

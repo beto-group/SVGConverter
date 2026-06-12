@@ -1,9 +1,6 @@
----
-cssclasses:
-  - svg-converter
----
-
 ```datacorejsx
-const { View } = await dc.require(dc.resolvePath("SVGConverter/src/index.jsx"));
-return View({ folderPath: dc.resolvePath("SVGConverter") });
+const currentFilePath = dc.useCurrentPath();
+const folderPath = currentFilePath ? currentFilePath.substring(0, currentFilePath.lastIndexOf("/")) : "";
+const { View } = await dc.require(folderPath + "/src/index.jsx");
+return View({ folderPath });
 ```

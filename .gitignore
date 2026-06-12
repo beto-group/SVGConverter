@@ -7,3 +7,7 @@ data/cache/
 
 # Ignore generated SVGs in the samples directory
 data/svg_samples/**/*.svg
+
+# Keep standard assets directories tracked
+!assets/image/
+!assets/videos/
